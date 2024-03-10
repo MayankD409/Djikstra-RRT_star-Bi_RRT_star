@@ -322,7 +322,7 @@ def plot_path(start_node, goal_node, x_path, y_path, all_nodes):
 
     # Draw explored nodes
     for node in all_nodes:
-        pygame.draw.rect(screen, (0, 255, 0), (node[0], 500 - node[1], 1, 1))  # Invert y-axis for explored nodes
+        pygame.draw.rect(screen, (190, 190, 0), (node[0], 500 - node[1], 1, 1))  # Invert y-axis for explored nodes
 
     # Draw shortest path
     for i in range(len(x_path) - 1):
@@ -344,6 +344,7 @@ if __name__ == '__main__':
 
     width = 1200
     height = 500
+    print("Wait few seconds for the input prompt...")
     obs_space = Configuration_space(width, height)
     
     # Taking start node coordinates as input from user
