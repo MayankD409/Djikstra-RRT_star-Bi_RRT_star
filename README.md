@@ -2,7 +2,7 @@
 
 This project implements Dijkstra's algorithm for path planning in a grid-based environment. The algorithm finds the shortest path between a start and a goal point while avoiding obstacles.
 
-![Configuration Space](Dijkstra_Point_Robot/images/Map_image.png "Configuration Space")
+<img src="images/Map_image.png" width="533">
 
 
 ## Features
