@@ -92,6 +92,41 @@ def Action_set(move,x,y,cost):
 
 ############ CONFIGURATION SPACE CONSTRUCTION WITH OBSTACLES ############
 
+def is_point_inside_rectangle(x, y, vertices):
+                x_min = min(vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0])
+                x_max = max(vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0])
+                y_min = min(vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1])
+                y_max = max(vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1])
+                return x_min <= x <= x_max and y_min <= y <= y_max
+
+def is_point_inside_hexagon(x, y , center_x, center_y, side_length):
+    cx, cy = center_x, center_y
+    vertices = []
+    angle_deg = 60
+    angle_rad = math.radians(angle_deg)
+    for i in range(6):
+        px = cx + side_length * math.cos(angle_rad * i + math.radians(30))
+        py = cy + side_length * math.sin(angle_rad * i + math.radians(30))
+        vertices.append((px, py))
+    odd_nodes = False
+    j = 5
+    for i in range(6):
+        if (vertices[i][1] < y and vertices[j][1] >= y) or (vertices[j][1] < y and vertices[i][1] >= y):
+            if (vertices[i][0] + (y - vertices[i][1]) / (vertices[j][1] - vertices[i][1]) * (vertices[j][0] - vertices[i][0])) < x:
+                odd_nodes = not odd_nodes
+        j = i
+    return odd_nodes
+
+def is_point_inside_block(point, vertices):
+    odd_nodes = False
+    j = len(vertices) - 1
+    for i in range(len(vertices)):
+        if (vertices[i][1] < point[1] and vertices[j][1] >= point[1]) or (vertices[j][1] < point[1] and vertices[i][1] >= point[1]):
+            if (vertices[i][0] + (point[1] - vertices[i][1]) / (vertices[j][1] - vertices[i][1]) * (vertices[j][0] - vertices[i][0])) < point[0]:
+                odd_nodes = not odd_nodes
+        j = i
+    return odd_nodes
+
 def C_obs_space(width,height):
 
     obs_space = np.full((height,width),0)
@@ -101,92 +136,48 @@ def C_obs_space(width,height):
             
         ####### CLEARANCE FOR THE OBSTACLES #######
             
-            # Plotting Buffer Space for the Obstacles using Half Plane Equations
-            
-            # Rectangle 1 Obastacle
-            r11_buffer = (x + 5) - 100  
-            r12_buffer = (y + 5) - 100
-            r13_buffer = (x - 5) - 175
-            # r14_buffer = (y - 5) - 500    # No need to define lower most line at boundry
-            
-            # Rectangle 2 Obastacle
-            r21_buffer = (x + 5) - 275  
-            # r22_buffer = (y - 5) - 0  # No need to define lower most line at boundry
-            r23_buffer = (x - 5) - 350
-            r24_buffer = (y - 5) - 400 
-            
-            # Hexagon Obstacle
-            h6_buffer = (y + 5) +  0.58*(x + 5) - 431.82
-            h5_buffer = (y + 5) + 0.58*(x - 5) - 231.72
-            h4_buffer = (x - 6.5) - 704.9
-            h3_buffer = (y - 5) + 0.58*(x - 5) - 731.78
-            h2_buffer = (y - 5) - 0.58*(x + 5) - 68.23
-            h1_buffer = (x + 6.5) - 445.1
-            
-            # Block Obstacle
-            t1_buffer = (x + 5) - 900
-            t2_buffer = (x + 5) - 1020
-            t3_buffer = (x - 5) - 1100
-            t4_buffer = (y + 5) - 50
-            t5_buffer = (y - 5) - 125
-            t6_buffer = (y + 5) - 375
-            t7_buffer = (y - 5) - 450
+            # Plotting Buffer Space for the Obstacles    
+            rectangle1_vts = [(95, 500), (180, 500), (180, 95), (95, 95)]
+            rectangle2_vts = [(270, 405), (355, 405), (355, 0), (270, 0)]
+            rect1_buffer = is_point_inside_rectangle(x, y, rectangle1_vts)
+            rect2_buffer = is_point_inside_rectangle(x, y, rectangle2_vts)
+
+            hexa_buffer = is_point_inside_hexagon(x, y, 650, 250, 155)
+            point = [x, y]
+            v2_buffer = [(895, 455), (895, 370), (1015, 370), (1015, 130), (895, 130), (895, 45), (1105, 45), (1105, 455)]
+            cblock_buffer = is_point_inside_block(point, v2_buffer)
             
             # Setting the line constrain to obatain the obstacle space with buffer
-            if((t1_buffer>0 and t2_buffer<0 and t4_buffer>0 and t5_buffer<0) or(t2_buffer>0 and t3_buffer<0 and t4_buffer>0 and t7_buffer<0) or (t6_buffer>0 and t7_buffer<0 and t1_buffer>0 and t2_buffer<0) or (r11_buffer>0 and r12_buffer>0 and r13_buffer<0) or (r21_buffer>0 and r23_buffer<0 and r24_buffer<0) or (h6_buffer<0 and h5_buffer>0 and h4_buffer>0 and h3_buffer>0 and h2_buffer>0 and h1_buffer<0)):
+            if(cblock_buffer or rect1_buffer or rect2_buffer or hexa_buffer):
                 obs_space[y, x] = 1
              
-             
             # Plotting Actual Object Space Half Plane Equations
-            
-            # Rectangle 1 Obastacle
-            r11 = (x) - 100  
-            r12 = (y) - 100
-            r13 = (x) - 175
-            # r14 = (y) - 500
-            
-            # Rectangle 2 Obastacle
-            r21 = (x) - 275  
-            # r22 = (y) - 0
-            r24 = (x) - 350
-            r23 = (y) - 400 
-            
-            # Hexagon Obstacle
-            h6 = (y) +  0.58*(x) - 431.82
-            h5 = (y) - 0.58*(x) + 231.72
-            h4 = (x) - 704.9
-            h3 = (y) + 0.58*(x) - 731.78
-            h2 = (y) - 0.58*(x) - 68.23
-            h1 = (x) - 445.1 
-            
-            # Block Obstacle
-            t1 = (x) - 900
-            t2 = (x) - 1020
-            t3 = (x) - 1100
-            t4 = (y) - 50
-            t5 = (y) - 125
-            t6 = (y) - 375
-            t7 = (y) - 450
+            rectangle1_vts = [(100, 500), (175, 500), (175, 100), (100, 100)]
+            rectangle2_vts = [(275, 400), (350, 400), (350, 0), (275, 0)]
+            rect1 = is_point_inside_rectangle(x, y, rectangle1_vts)
+            rect2 = is_point_inside_rectangle(x, y, rectangle2_vts)
+
+            hexa = is_point_inside_hexagon(x, y, 650, 250, 150)
+            point = [x, y]
+            v2 = [(900, 450), (900, 375), (1020, 375), (1020, 125), (900, 125), (900, 50), (1100, 50), (1100, 450)]
+            cblock = is_point_inside_block(point, v2)
 
             # Setting the line constrain to obatain the obstacle space with buffer
-            if((h6>0 and h5>0 and h4<0 and h3<0 and h2<0 and h1>0) or (r11>0 and r12>0 and r13<0 ) or (r21>0  and r23<0 and r24<0) or (t1>0 and t2<0 and t4>0 and t5<0) or (t2>0 and t3<0 and t4>0 and t7<0) or (t6>0 and t7<0 and t1>0 and t2<0)):
+            if(cblock or rect1 or rect2 or hexa):
                 obs_space[y, x] = 2
                 
                 
 ####### DEFINING THE BOUNDARIES FOR CONFIGURATION SPACE ########
+    for i in range(height):
+        for j in range(6):
+            obs_space[i][j] = 1
+            obs_space[i][width - j - 1] = 1
+    
+    for i in range(width):
+        for j in range(6):  # Mark the first 5 columns of the top and bottom boundaries as unreachable
+            obs_space[j][i] = 1
+            obs_space[height - j - 1][i] = 1  # Also mark the first 5 columns of the bottom boundary as unreachable
 
-    for i in range(1200):
-        obs_space[0][i] = 1
-        
-    for i in range(1200):
-        obs_space[499][i] = 1
-        
-    for i in range(500):
-        obs_space[i][1] = 1
-        
-    for i in range(500):
-        obs_space[i][1199] = 1
-       
     return obs_space
 
 ########## TO SEE IF THE MOVE IS VALID OR NOT #########
@@ -312,6 +303,7 @@ def Backtrack(goal_node):
 
 # Function to draw a hexagon
 def draw_hexagon(screen, color, center_x, center_y, side_length):
+    # vertices = [(575, 400), (704.9, 325), (704.9, 174), (575, 100), (445.1, 175), (445.1, 325)]
     vertices = []
     angle_deg = 60
     angle_rad = math.radians(angle_deg)
@@ -334,7 +326,7 @@ def draw_C(screen, color):
 def plot(start_node, goal_node, x_path, y_path, all_nodes, obs_space):
     pygame.init()
     screen = pygame.display.set_mode((1200, 500))
-    screen.fill((255, 255, 255))
+    screen.fill((190, 190, 190))
     pygame.display.set_caption("Path Planning")
 
     # Colors
