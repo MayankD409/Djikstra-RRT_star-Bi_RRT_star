@@ -1,78 +1,76 @@
-#!/usr/bin/env python3
-
 import pygame
 import numpy as np
 import time
 import heapq
 import math
+import os
+import cv2
 
 ########## DEFINING A NODE CLASS TO STORE NODES AS OBJECTS ###############
 
 class Node:
-
     def __init__(self, x, y, cost, parent_id):
-
         self.x = x
         self.y = y
         self.cost = cost
         self.parent_id = parent_id
     
-    def __lt__(self,other):
+    def __lt__(self, other):
         return self.cost < other.cost
 
 ########### DEFINING ACTIONS TO BE PERFORMED ##############
 ########### CALCULATING COST TO COME FOR ALL ACTIONS ########
 
-def up(x,y,cost):
+def up(x, y, cost):
     x = x
     y = y + 1
     cost = cost + 1
-    return x,y,cost
+    return x, y, cost
 
-def down(x,y,cost):
+def down(x, y, cost):
     x = x
     y = y - 1
     cost = cost + 1
-    return x,y,cost
+    return x, y, cost
 
-def left(x,y,cost):
-    x = x-1
+def left(x, y, cost):
+    x = x - 1
     y = y
     cost = cost + 1
-    return x,y,cost
+    return x, y, cost
 
-def right(x,y,cost):
+def right(x, y, cost):
     x = x + 1
     y = y
     cost = cost + 1
-    return x,y,cost
+    return x, y, cost
 
-def bottom_left(x,y,cost):
+def bottom_left(x, y, cost):
     x = x - 1
     y = y - 1
     cost = cost + 1.4
-    return x,y,cost
+    return x, y, cost
 
-def bottom_right(x,y,cost):
+def bottom_right(x, y, cost):
     x = x + 1
     y = y - 1
     cost = cost + 1.4
-    return x,y,cost
+    return x, y, cost
 
-def up_left(x,y,cost):
+def up_left(x, y, cost):
     x = x - 1
     y = y + 1
     cost = cost + 1.4
-    return x,y,cost
+    return x, y, cost
 
-def up_right(x,y,cost):
+def up_right(x, y, cost):
     x = x + 1
     y = y + 1
     cost = cost + 1.4
-    return x,y,cost
+    return x, y, cost
 
 ############ CONFIGURATION SPACE CONSTRUCTION WITH OBSTACLES ############
-
+#### Check if point is inside Rectangle ####
 def is_point_inside_rectangle(x, y, vertices):
     x_min = min(vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0])
     x_max = max(vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0])
@@ -80,6 +78,7 @@ def is_point_inside_rectangle(x, y, vertices):
     y_max = max(vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1])
     return x_min <= x <= x_max and y_min <= y <= y_max
 
+#### Check if point is inside hexagon ####
 def is_point_inside_hexagon(x, y , center_x, center_y, side_length):
     cx, cy = center_x, center_y
     vertices = []
@@ -97,7 +96,7 @@ def is_point_inside_hexagon(x, y , center_x, center_y, side_length):
                 odd_nodes = not odd_nodes
         j = i
     return odd_nodes
-
+#### Check if point is inside C-Block ####
 def is_point_inside_block(point, vertices):
     odd_nodes = False
     j = len(vertices) - 1
@@ -108,14 +107,14 @@ def is_point_inside_block(point, vertices):
         j = i
     return odd_nodes
 
+#### Define the COnfiguration Space ####
 def Configuration_space(width,height):
-
     obs_space = np.full((height,width),0)
     
     for y in range(height) :
         for x in range(width):
             
-        ####### CLEARANCE FOR THE OBSTACLES #######
+            ####### CLEARANCE FOR THE OBSTACLES #######
             point = [x, y]
             # Plotting Buffer Space for the Obstacles    
             rectangle1_buffer_vts = [(95, 500), (180, 500), (180, 95), (95, 95)]
@@ -127,7 +126,7 @@ def Configuration_space(width,height):
             hexa_buffer = is_point_inside_hexagon(x, y, 650, 250, 155)
             cblock_buffer = is_point_inside_block(point, cblock_buffer_vts)
             
-            # Setting the line constrain to obatain the obstacle space with buffer
+            # Setting the line constrain to obtain the obstacle space with buffer
             if(cblock_buffer or rect1_buffer or rect2_buffer or hexa_buffer):
                 obs_space[y, x] = 1
              
@@ -141,10 +140,9 @@ def Configuration_space(width,height):
             hexa = is_point_inside_hexagon(x, y, 650, 250, 150)
             cblock = is_point_inside_block(point, cblock_vertices)
 
-            # Setting the line constrain to obatain the obstacle space with buffer
+            # Setting the line constrain to obtain the obstacle space with buffer
             if(cblock or rect1 or rect2 or hexa):
                 obs_space[y, x] = 2
-                
                 
     ####### CLEARANCE FOR THE WALLS ########
     for i in range(height):
@@ -179,24 +177,17 @@ def is_goal(present, goal):
     else:
         return False
 
-############# GENERATE UNIQUE KEY ##############
-
-def key(node):
-    key = 1022*node.x + 111*node.y 
-    return key
-
-
 ############# DIJKSTRA ALGORITHM ###############
-# moves = [up, down, left, right, bottom_left, bottom_right, up_left, up_right]
+
 def dijkstra(start_node, goal_node, obs_space):
     if is_goal(start_node, goal_node):
         return None, 1
     
     possible_moves = [up, down, left, right, bottom_left, bottom_right, up_left, up_right]
-    open_nodes = {}  # List of all open nodes
-    open_nodes[key(start_node)] = start_node
+    open_nodes = {}  # Dictionary of all open nodes with coordinates as keys
+    open_nodes[(start_node.x, start_node.y)] = start_node
     
-    closed_nodes = {}  # List of all closed nodes
+    closed_nodes = {}  # Dictionary of all closed nodes with coordinates as keys
     priority_queue = []  # List to store all dictionary entries with cost as the sorting variable
     heapq.heappush(priority_queue, [start_node.cost, start_node])  # Prioritize nodes with less cost
     
@@ -205,7 +196,7 @@ def dijkstra(start_node, goal_node, obs_space):
     while priority_queue:
         current_node = heapq.heappop(priority_queue)[1]
         traversed_nodes.append([current_node.x, current_node.y])
-        current_node_id = key(current_node)
+        current_node_coords = (current_node.x, current_node.y)
         
         if is_goal(current_node, goal_node):
             goal_node.parent_id = current_node.parent_id
@@ -213,34 +204,33 @@ def dijkstra(start_node, goal_node, obs_space):
             print("Goal Node found")
             return traversed_nodes, 1
 
-        if current_node_id in closed_nodes:  
+        if current_node_coords in closed_nodes:  
             continue
         else:
-            closed_nodes[current_node_id] = current_node
+            closed_nodes[current_node_coords] = current_node
         
-        del open_nodes[current_node_id]
+        del open_nodes[current_node_coords]
         
         for move in possible_moves:
             x, y, cost = move(current_node.x, current_node.y, current_node.cost)
             new_node = Node(x, y, cost, current_node)  
-            new_node_id = key(new_node) 
+            new_node_coords = (new_node.x, new_node.y) 
             
             if not is_valid(new_node.x, new_node.y, obs_space):
                 continue
-            elif new_node_id in closed_nodes:
+            elif new_node_coords in closed_nodes:
                 continue
 
-            if new_node_id in open_nodes:
-                if new_node.cost < open_nodes[new_node_id].cost: 
-                    open_nodes[new_node_id].cost = new_node.cost
-                    open_nodes[new_node_id].parent_id = new_node.parent_id
+            if new_node_coords in open_nodes:
+                if new_node.cost < open_nodes[new_node_coords].cost: 
+                    open_nodes[new_node_coords].cost = new_node.cost
+                    open_nodes[new_node_coords].parent_id = new_node.parent_id
             else:
-                open_nodes[new_node_id] = new_node
+                open_nodes[new_node_coords] = new_node
             
             heapq.heappush(priority_queue, [new_node.cost, new_node])
    
     return traversed_nodes, 0
-
 
 
 ########### BACKTRACK AND GENERATE SHORTEST PATH ############
@@ -285,9 +275,8 @@ def draw_C(screen, color):
     vertices = [(900, 450), (900, 375), (1020, 375), (1020, 125), (900, 125), (900, 50), (1100, 50), (1100, 450)]
     pygame.draw.polygon(screen, color, vertices)
 
-def plot_path(start_node, goal_node, x_path, y_path, all_nodes):
-    # Colors
-    GREEN = (0, 255, 0)
+def plot_path(start_node, goal_node, x_path, y_path, all_nodes, frame_rate):
+    BLUE = (0, 0, 255)
     RED = (255, 0, 0)
     WHITE = (255, 255, 255)
     LIGHT_GREY = (190, 190, 190)
@@ -297,57 +286,79 @@ def plot_path(start_node, goal_node, x_path, y_path, all_nodes):
     center_x, center_y = 650, 250
     side_length = 150
 
-    ### Initialize Pygame and plot the map ###
+    # Initialize Pygame and plot the map
     pygame.init()
     screen = pygame.display.set_mode((1200, 500))
-    screen.fill(LIGHT_GREY)
-    pygame.display.set_caption("DIJKSTRA ON POINT_ROBOT")
-
-    # Draw obstacles
-    padding_rect = pygame.Rect(padding, padding, 1200 - 2 * padding, 500 - 2 * padding)
-    pygame.draw.rect(screen, WHITE, padding_rect)
-    draw_padded_hexagon(screen, LIGHT_GREY, center_x, center_y, side_length, padding)
-    draw_hexagon(screen, DARK_GREY, center_x, center_y, side_length)
-    cblock_vertices = [(895, 455), (895, 370), (1015, 370), (1015, 130), (895, 130), (895, 45), (1105, 45), (1105, 455)]
-    pygame.draw.polygon(screen, LIGHT_GREY, cblock_vertices)
-    draw_C(screen, DARK_GREY)
-    pygame.draw.rect(screen, LIGHT_GREY, pygame.Rect(95, 0, 85, 405)) # Rectangle1 Clearance 
-    pygame.draw.rect(screen, LIGHT_GREY, pygame.Rect(270, 95, 85, 405)) # Rectangle1 Obstacle 
-    pygame.draw.rect(screen, DARK_GREY, pygame.Rect(100, 0, 75, 400)) # Rectangle2 Clearance
-    pygame.draw.rect(screen, DARK_GREY, pygame.Rect(275, 100, 75, 400)) # Rectangle2 Obstacle
-
-    # Draw start and goal nodes
-    pygame.draw.rect(screen, GREEN, (start_node.x, 500 - start_node.y, 3, 3))  # Invert y-axis for start node
-    pygame.draw.rect(screen, RED, (goal_node.x, 500 - goal_node.y, 3, 3))  # Invert y-axis for goal node
-
-    # Draw explored nodes
-    for node in all_nodes:
-        pygame.draw.rect(screen, (190, 190, 0), (node[0], 500 - node[1], 1, 1))  # Invert y-axis for explored nodes
-
-    # Draw shortest path
-    for i in range(len(x_path) - 1):
-        pygame.draw.line(screen, RED, (x_path[i], 500 - y_path[i]), (x_path[i + 1], 500 - y_path[i + 1]), width=3)  # Invert y-axis for shortest path
-
-    pygame.display.flip()
+    clock = pygame.time.Clock()
+    if not os.path.exists("frames"):
+        os.makedirs("frames")
+    
+    frame_count = 0
+    # Counter to keep track of frames
 
     running = True
-    while running:
+    while running and frame_count < len(all_nodes) + len(x_path) - 1:  # Terminate loop once all frames are saved
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+        
+        screen.fill(LIGHT_GREY)
+        padding_rect = pygame.Rect(padding, padding, 1200 - 2 * padding, 500 - 2 * padding)
+        pygame.draw.rect(screen, WHITE, padding_rect)
+        draw_padded_hexagon(screen, LIGHT_GREY, center_x, center_y, side_length, padding)
+        draw_hexagon(screen, DARK_GREY, center_x, center_y, side_length)
+        cblock_vertices = [(895, 455), (895, 370), (1015, 370), (1015, 130), (895, 130), (895, 45), (1105, 45), (1105, 455)]
+        pygame.draw.polygon(screen, LIGHT_GREY, cblock_vertices)
+        draw_C(screen, DARK_GREY)
+        pygame.draw.rect(screen, LIGHT_GREY, pygame.Rect(95, 0, 85, 405)) # Rectangle1 Clearance 
+        pygame.draw.rect(screen, LIGHT_GREY, pygame.Rect(270, 95, 85, 405)) # Rectangle1 Obstacle 
+        pygame.draw.rect(screen, DARK_GREY, pygame.Rect(100, 0, 75, 400)) # Rectangle2 Clearance
+        pygame.draw.rect(screen, DARK_GREY, pygame.Rect(275, 100, 75, 400)) # Rectangle2 Obstacle
+
+        pygame.draw.rect(screen, RED, (start_node.x, 500 - start_node.y, 10, 10))  # Invert y-axis for start node
+        pygame.draw.rect(screen, RED, (goal_node.x, 500 - goal_node.y, 10, 10))  # Invert y-axis for goal node
+
+        for node in all_nodes:
+            pygame.draw.rect(screen, (190, 190, 0), (node[0], 500 - node[1], 1, 1))  # Invert y-axis for explored nodes
+            frame_count += 1
+            if frame_count % 250 == 0:  # Save frame every 100th frame
+                pygame.image.save(screen, os.path.join("frames", f"frame_{frame_count}.png"))
+            pygame.display.update()
+
+        for i in range(len(x_path) - 1):
+            pygame.draw.line(screen, BLUE, (x_path[i], 500 - y_path[i]), (x_path[i + 1], 500 - y_path[i + 1]), width=4)
+            pygame.image.save(screen, os.path.join("frames", f"frame_{frame_count}.png"))
+            frame_count += 1
+            pygame.display.update()
+        
+
+        clock.tick(frame_rate)  # Ensure frame rate
 
     pygame.quit()
 
-######### CALLING ALL MY FUNCTIONS TO IMPLEMENT DIJKSTRA ALGORITHM ON A POINT ROBOT ###########
+
+def frames_to_video(frames_dir, output_video):
+    frames = [img for img in os.listdir(frames_dir) if img.endswith(".png")]
+    frames.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))  # Sort frames by frame number
+    frame = cv2.imread(os.path.join(frames_dir, frames[0]))
+    height, width, layers = frame.shape
+    print("Creating Videowriter")
+    video = cv2.VideoWriter(output_video, cv2.VideoWriter_fourcc(*'mp4v'), 60, (width, height))
+    print("Writing Video")
+    for frame in frames:
+        video.write(cv2.imread(os.path.join(frames_dir, frame)))
+
+    cv2.destroyAllWindows()
+    video.release()
+
 
 if __name__ == '__main__':
-
     width = 1200
     height = 500
     print("Wait few seconds for the input prompt...")
     obs_space = Configuration_space(width, height)
     
-    # Taking start node coordinates as input from user
+    # Taking start and end node coordinates as input from the user
     start_input_x = input("Enter the Start X: ")
     start_input_y = input("Enter the Start Y: ")
 
@@ -364,23 +375,24 @@ if __name__ == '__main__':
     start_point = Node(start_x, start_y, 0, -1)  # Start node with cost 0 and no parent
     goal_point = Node(end_x, end_y, 0, -1)  # You can adjust the goal node coordinates as needed
 
-    timer_begin = time.time()
+    save_dir = "frames"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    # Run Dijkstra algorithm
-    all_explored_nodes, goal_found = dijkstra(start_point, goal_point, obs_space)
+    timer_begin = time.time()
+    traversed_nodes, goal_found = dijkstra(start_point, goal_point, obs_space)
+    timer_end = time.time()
+    print("Time taken to explore:", timer_end - timer_begin, "seconds")
 
     if goal_found:
-        # Generate shortest path
         x_path, y_path = backtrack(goal_point)
-
-        # Plot the result using Pygame
-        timer_end = time.time()
-        plot_path(start_point, goal_point, x_path, y_path, all_explored_nodes)
+        optimal_cost = goal_point.cost  # Cost of the optimal path
+        print("Optimal path cost:", optimal_cost)
+        plot_path(start_point, goal_point, x_path, y_path, traversed_nodes, frame_rate=30)
+        output_video = "output_video.mp4"
+        print("Generating Video")
+        frames_to_video(save_dir, output_video)
+        print("Video created successfully!")
     else:
-        print("Goal not found.")
-        timer_end = time.time()
+        print("Goal not found!")
 
-    
-
-    total_runtime = timer_end - timer_begin
-    print("The Total Runtime is:  ", total_runtime)
